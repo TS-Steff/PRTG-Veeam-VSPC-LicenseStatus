@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValueLookup id="sm-it.veeam.vspc.cc.cloudconnect.status" desiredValue="1" undefinedState="Error" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="PaeValueLookup.xsd">
+  <Lookups>
+    <SingleInt state="Error" value="0">Cloud Connect disabled</SingleInt>
+    <SingleInt state="OK" value="1">Cloud Connect enabled</SingleInt>
+  </Lookups>
+</ValueLookup>

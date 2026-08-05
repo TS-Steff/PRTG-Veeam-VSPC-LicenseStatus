@@ -1,9 +1,9 @@
 param(
     [switch]$listTenants,
-    [ValidateSet('VBR', 'Agent', 'MS365')]
+    [ValidateSet('VBR', 'Agent', 'MS365', 'CC')]
     [string[]]$allLicenses,
     [string]$TenantLicences,
-    [ValidateSet('VBR', 'Agent', 'MS365')]
+    [ValidateSet('VBR', 'Agent', 'MS365', 'CC')]
     [string[]]$licenseType,
     [Alias('debug')]
     [switch]$DebugOutput
@@ -40,6 +40,18 @@ if ($allLicenses) {
     if ($DebugOutput) {
         Show-AllLicenseOverviewDebug -LicenseOverview $allLicenseOverview -LicenseType $allLicenses
     }
+    else {
+        $selectedTypes = @($allLicenses)
+        if ($selectedTypes.Count -ne 1) {
+            throw 'PRTG Advanced XML output for -allLicenses requires exactly one value.'
+        }
+
+        switch ($selectedTypes[0]) {
+            'CC' {
+                Write-Output (Convert-CloudConnectLicenseOverviewToPrtgXml -LicenseOverview $allLicenseOverview)
+            }
+        }
+    }
 
     exit 0
 }
@@ -55,6 +67,10 @@ if ($TenantLicences) {
         $selectedTypes = @($licenseType)
         if ($selectedTypes.Count -ne 1) {
             throw 'PRTG Advanced XML output requires exactly one value for -licenseType.'
+        }
+
+        if ($selectedTypes[0] -eq 'CC') {
+            throw 'Cloud Connect licenses are provider-level. Use -allLicenses CC instead of -TenantLicences ... -licenseType CC.'
         }
 
         switch ($selectedTypes[0]) {

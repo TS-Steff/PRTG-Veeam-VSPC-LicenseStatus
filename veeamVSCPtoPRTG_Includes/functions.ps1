@@ -98,6 +98,50 @@ function get-Vb365LicenseByUid($vb365ServerUid){
     return Invoke-VspcGet ('licensing/vb365Servers/' + $vb365ServerUid)
 }
 
+function get-CloudConnectSites{
+    return Invoke-VspcGet 'infrastructure/sites'
+}
+
+function get-CloudConnectSiteByUid($siteUid){
+    return Invoke-VspcGet ('infrastructure/sites/' + $siteUid)
+}
+
+function get-CloudConnectSiteLicenseByUid($siteUid){
+    return Invoke-VspcGet ('licensing/sites/' + $siteUid)
+}
+
+function get-CloudConnectTenantsByOrgUID($orgUID){
+    $queryPath = 'infrastructure/sites/tenants?filter=[{"property":"assignedForCompany","operation":"equals","value":"' + $orgUID + '"}]'
+    return Invoke-VspcGet $queryPath
+}
+
+function Get-CloudConnectLicenseOverview {
+    $cloudConnectLicenses = @(
+        foreach ($site in @(get-CloudConnectSites | Sort-Object siteName)) {
+            $siteUid = [string](Get-OptionalPropertyValue $site @('siteUid', 'backupServerUid', 'instanceUid'))
+            if ([string]::IsNullOrWhiteSpace($siteUid)) {
+                continue
+            }
+
+            $license = get-CloudConnectSiteLicenseByUid $siteUid
+
+            [pscustomobject]@{
+                Status               = ConvertTo-DisplayValue (Get-OptionalPropertyValue $license @('status'))
+                Hostname             = ConvertTo-DisplayValue (Get-OptionalPropertyValue $site @('siteName', 'name', 'hostName'))
+                'Cloud Connect'      = ConvertTo-DisplayValue (Get-OptionalPropertyValue $license @('cloudConnect'))
+                'License Expiration' = ConvertTo-DisplayValue (Get-OptionalPropertyValue $license @('expirationDate'))
+                Units                = ConvertTo-DisplayValue (Get-OptionalPropertyValue $license @('units'))
+                'Used Units'         = ConvertTo-DisplayValue (Get-OptionalPropertyValue $license @('usedUnits'))
+                'License ID'         = ConvertTo-DisplayValue (Get-OptionalPropertyValue $license @('licenseId', 'licenseIds'))
+            }
+        }
+    )
+
+    return [pscustomobject]@{
+        CloudConnectLicenses = $cloudConnectLicenses
+    }
+}
+
 function Get-OptionalPropertyValue {
     param(
         $InputObject,
@@ -273,6 +317,36 @@ function Get-Ms365PrtgStatusCode {
     return 0
 }
 
+function Get-CloudConnectPrtgStatusCode {
+    param($License)
+
+    $status = [string](Get-OptionalPropertyValue $License @('Status'))
+    $units = Get-NullableDouble (Get-OptionalPropertyValue $License @('Units'))
+    $usedUnits = Get-NullableDouble (Get-OptionalPropertyValue $License @('Used Units'))
+    $expirationDate = Get-NullableDateTime (Get-OptionalPropertyValue $License @('License Expiration'))
+
+    if ($status -ne 'Valid') {
+        return 4
+    }
+
+    if ($null -ne $units -and $null -ne $usedUnits -and $usedUnits -gt $units) {
+        return 3
+    }
+
+    if ($null -ne $expirationDate) {
+        $daysRemaining = [math]::Floor(($expirationDate.UtcDateTime - (Get-Date).ToUniversalTime()).TotalDays)
+        if ($daysRemaining -le 15) {
+            return 2
+        }
+
+        if ($daysRemaining -le 60) {
+            return 1
+        }
+    }
+
+    return 0
+}
+
 function New-PrtgResultXml {
     param(
         [Parameter(Mandatory = $true)]
@@ -347,7 +421,7 @@ function Get-TenantLicenseOverview {
     param(
         [Parameter(Mandatory = $true)]
         [string]$TenantName,
-        [ValidateSet('VBR', 'Agent', 'MS365')]
+        [ValidateSet('VBR', 'Agent', 'MS365', 'CC')]
         [string[]]$LicenseType
     )
 
@@ -420,11 +494,12 @@ function Get-TenantLicenseOverview {
     }
 
     return [pscustomobject]@{
-        TenantUid      = $tenantUid
-        TenantName     = $tenant.name
-        VbrLicenses    = $vbrLicenses
-        AgentLicenses  = $agentLicenses
-        Vb365Licenses  = $vb365Licenses
+        TenantUid            = $tenantUid
+        TenantName           = $tenant.name
+        VbrLicenses          = $vbrLicenses
+        AgentLicenses        = $agentLicenses
+        Vb365Licenses        = $vb365Licenses
+        CloudConnectLicenses = @()
     }
 }
 
@@ -432,7 +507,7 @@ function Show-TenantLicenseOverviewDebug {
     param(
         [Parameter(Mandatory = $true)]
         $LicenseOverview,
-        [ValidateSet('VBR', 'Agent', 'MS365')]
+        [ValidateSet('VBR', 'Agent', 'MS365', 'CC')]
         [string[]]$LicenseType
     )
 
@@ -463,18 +538,25 @@ function Show-TenantLicenseOverviewDebug {
         $LicenseOverview.Vb365Licenses |
             Select-Object Status, 'License Auto Update', Hostname, Units, 'Used Units' |
             Format-Table -AutoSize
+        Write-Host ''
     }
+
 }
 
 function Get-AllLicenseOverview {
     param(
-        [ValidateSet('VBR', 'Agent', 'MS365')]
+        [ValidateSet('VBR', 'Agent', 'MS365', 'CC')]
         [string[]]$LicenseType
     )
 
     $allVbrLicenses = @()
     $allAgentLicenses = @()
     $allVb365Licenses = @()
+    $allCloudConnectLicenses = @()
+
+    $selectedTypes = @($LicenseType)
+    $includeAllTypes = $selectedTypes.Count -eq 0
+    $includeCc = $includeAllTypes -or $selectedTypes -contains 'CC'
 
     foreach ($tenant in @(get-AllOrgs | Sort-Object name)) {
         $licenseOverview = Get-TenantLicenseOverview -TenantName $tenant.name -LicenseType $LicenseType
@@ -510,12 +592,29 @@ function Get-AllLicenseOverview {
                 'Used Units'          = $vb365License.'Used Units'
             }
         }
+
+    }
+
+    if ($includeCc) {
+        foreach ($cloudConnectLicense in @(Get-CloudConnectLicenseOverview).CloudConnectLicenses) {
+            $allCloudConnectLicenses += [pscustomobject]@{
+                Tenant               = 'Provider'
+                Status               = $cloudConnectLicense.Status
+                Hostname             = $cloudConnectLicense.Hostname
+                'Cloud Connect'      = $cloudConnectLicense.'Cloud Connect'
+                'License Expiration' = $cloudConnectLicense.'License Expiration'
+                Units                = $cloudConnectLicense.Units
+                'Used Units'         = $cloudConnectLicense.'Used Units'
+                'License ID'         = $cloudConnectLicense.'License ID'
+            }
+        }
     }
 
     return [pscustomobject]@{
-        VbrLicenses   = $allVbrLicenses
-        AgentLicenses = $allAgentLicenses
-        Vb365Licenses = $allVb365Licenses
+        VbrLicenses          = $allVbrLicenses
+        AgentLicenses        = $allAgentLicenses
+        Vb365Licenses        = $allVb365Licenses
+        CloudConnectLicenses = $allCloudConnectLicenses
     }
 }
 
@@ -523,7 +622,7 @@ function Show-AllLicenseOverviewDebug {
     param(
         [Parameter(Mandatory = $true)]
         $LicenseOverview,
-        [ValidateSet('VBR', 'Agent', 'MS365')]
+        [ValidateSet('VBR', 'Agent', 'MS365', 'CC')]
         [string[]]$LicenseType
     )
 
@@ -532,6 +631,7 @@ function Show-AllLicenseOverviewDebug {
     $showVbr = $includeAllTypes -or $selectedTypes -contains 'VBR'
     $showAgent = $includeAllTypes -or $selectedTypes -contains 'Agent'
     $showMs365 = $includeAllTypes -or $selectedTypes -contains 'MS365'
+    $showCc = $includeAllTypes -or $selectedTypes -contains 'CC'
 
     if ($showVbr -and $LicenseOverview.VbrLicenses.Count -gt 0) {
         Write-Host 'Veeam Backup & Replication'
@@ -553,6 +653,14 @@ function Show-AllLicenseOverviewDebug {
         Write-Host 'Veeam Backup for Microsoft 365'
         $LicenseOverview.Vb365Licenses |
             Select-Object Tenant, Status, 'License Auto Update', Hostname, Units, 'Used Units' |
+            Format-Table -AutoSize
+        Write-Host ''
+    }
+
+    if ($showCc -and $LicenseOverview.CloudConnectLicenses.Count -gt 0) {
+        Write-Host 'Veeam Cloud Connect'
+        $LicenseOverview.CloudConnectLicenses |
+            Select-Object Tenant, Status, Hostname, 'Cloud Connect', 'License Expiration', Units, 'Used Units', 'License ID' |
             Format-Table -AutoSize
     }
 }
@@ -772,6 +880,110 @@ function Convert-Ms365LicenseOverviewToPrtgXml {
     }
     else {
         'No Microsoft 365 licenses found.'.Replace('#', '')
+    }
+
+    [void]$xml.AppendLine(("  <text>{0}</text>" -f (ConvertTo-XmlSafeText $sensorMessage)))
+    [void]$xml.AppendLine('</prtg>')
+    return $xml.ToString()
+}
+
+function Convert-CloudConnectLicenseOverviewToPrtgXml {
+    param(
+        [Parameter(Mandatory = $true)]
+        $LicenseOverview
+    )
+
+    $lookupId = 'sm-it.veeam.vspc.cc.license.status'
+    $xml = [System.Text.StringBuilder]::new()
+    [void]$xml.AppendLine('<?xml version="1.0" encoding="UTF-8" ?>')
+    [void]$xml.AppendLine('<prtg>')
+
+    $messageParts = @()
+
+    foreach ($license in @($LicenseOverview.CloudConnectLicenses)) {
+        $hostname = [string](Get-OptionalPropertyValue $license @('Hostname'))
+        $licenseId = [string](Get-OptionalPropertyValue $license @('License ID'))
+        $statusCode = Get-CloudConnectPrtgStatusCode -License $license
+        $units = Get-NullableDouble (Get-OptionalPropertyValue $license @('Units'))
+        $usedUnits = Get-NullableDouble (Get-OptionalPropertyValue $license @('Used Units'))
+        $expirationDate = Get-NullableDateTime (Get-OptionalPropertyValue $license @('License Expiration'))
+        $cloudConnect = [string](Get-OptionalPropertyValue $license @('Cloud Connect'))
+        $daysRemaining = $null
+        if ($null -ne $expirationDate) {
+            $daysRemaining = [math]::Floor(($expirationDate.UtcDateTime - (Get-Date).ToUniversalTime()).TotalDays)
+        }
+
+        $channelLabel = if ($hostname) { $hostname } else { 'Unknown Host' }
+        $messageParts += "{0}: {1}" -f $channelLabel, ($(if ($licenseId) { $licenseId } else { 'No License ID' }))
+
+        [void]$xml.Append(
+            (New-PrtgResultXml `
+                -Channel ("Status - {0}" -f $channelLabel) `
+                -Value ([string]$statusCode) `
+                -Unit 'Custom' `
+                -CustomUnit 'State' `
+                -ValueLookup $lookupId `
+                -Float 0)
+        )
+
+        if ($null -ne $units) {
+            [void]$xml.Append(
+                (New-PrtgResultXml `
+                    -Channel ("Units - {0}" -f $channelLabel) `
+                    -Value ([string]$units) `
+                    -Unit 'Custom' `
+                    -CustomUnit 'Units' `
+                    -Float 0)
+            )
+        }
+
+        if ($null -ne $usedUnits) {
+            [void]$xml.Append(
+                (New-PrtgResultXml `
+                    -Channel ("Used Units - {0}" -f $channelLabel) `
+                    -Value ([string]$usedUnits) `
+                    -Unit 'Custom' `
+                    -CustomUnit 'Units' `
+                    -Float 0 `
+                    -LimitMaxError $units `
+                    -LimitErrorMsg 'Used units exceeded licensed units.')
+            )
+        }
+
+        if ($null -ne $daysRemaining) {
+            [void]$xml.Append(
+                (New-PrtgResultXml `
+                    -Channel ("Days Remaining - {0}" -f $channelLabel) `
+                    -Value ([string]$daysRemaining) `
+                    -Unit 'Custom' `
+                    -CustomUnit 'Days' `
+                    -Float 0 `
+                    -LimitMinWarning 60 `
+                    -LimitMinError 15 `
+                    -LimitWarningMsg 'License expires within 60 days.' `
+                    -LimitErrorMsg 'License expires within 15 days.')
+            )
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($cloudConnect)) {
+            $cloudConnectValue = if ($cloudConnect -eq 'Yes') { 1 } else { 0 }
+            [void]$xml.Append(
+                (New-PrtgResultXml `
+                    -Channel ("Cloud Connect - {0}" -f $channelLabel) `
+                    -Value ([string]$cloudConnectValue) `
+                    -Unit 'Custom' `
+                    -CustomUnit 'State' `
+                    -ValueLookup 'sm-it.veeam.vspc.cc.cloudconnect.status' `
+                    -Float 0)
+            )
+        }
+    }
+
+    $sensorMessage = if ($messageParts.Count -gt 0) {
+        ($messageParts -join ' | ').Replace('#', '')
+    }
+    else {
+        'No Cloud Connect licenses found.'.Replace('#', '')
     }
 
     [void]$xml.AppendLine(("  <text>{0}</text>" -f (ConvertTo-XmlSafeText $sensorMessage)))

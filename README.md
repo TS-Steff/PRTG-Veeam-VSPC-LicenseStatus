@@ -17,6 +17,8 @@ Required lookup files:
 - `sm-it.veeam.vspc.agent.license.status.ovl`
 - `sm-it.veeam.vspc.ms365.license.status.ovl`
 - `sm-it.veeam.vspc.ms365.autoupdate.status.ovl`
+- `sm-it.veeam.vspc.cc.license.status.ovl`
+- `sm-it.veeam.vspc.cc.cloudconnect.status.ovl`
 
 ## Script
 
@@ -29,9 +31,9 @@ Required lookup files:
 ```powershell
 .\veeamVSPCLicenses.ps1 `
   [-listTenants] `
-  [-allLicenses VBR|Agent|MS365] `
+  [-allLicenses VBR|Agent|MS365|CC] `
   [-TenantLicences "Tenant Name"] `
-  [-licenseType VBR|Agent|MS365] `
+  [-licenseType VBR|Agent|MS365|CC] `
   [-debug]
 ```
 
@@ -56,12 +58,13 @@ Example:
 ```powershell
 .\veeamVSPCLicenses.ps1 -allLicenses VBR
 .\veeamVSPCLicenses.ps1 -allLicenses VBR -debug
-.\veeamVSPCLicenses.ps1 -allLicenses VBR,MS365 -debug
+.\veeamVSPCLicenses.ps1 -allLicenses CC
+.\veeamVSPCLicenses.ps1 -allLicenses VBR,MS365,CC -debug
 ```
 
 Current behavior:
 
-- Without `-debug`, no output is shown yet.
+- Without `-debug`, `PRTG Advanced XML` output is currently implemented for `-allLicenses CC`.
 - With `-debug`, the collected data is shown as tables.
 
 Allowed values:
@@ -69,6 +72,7 @@ Allowed values:
 - `VBR`
 - `Agent`
 - `MS365`
+- `CC`
 
 ### `-TenantLicences`
 
@@ -95,6 +99,7 @@ Allowed values:
 - `VBR`
 - `Agent`
 - `MS365`
+- `CC`
 
 Examples:
 
@@ -115,6 +120,13 @@ For `PRTG Advanced XML` output, use exactly one license type:
 .\veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType MS365
 ```
 
+Cloud Connect is provider-level and should be queried with:
+
+```powershell
+.\veeamVSPCLicenses.ps1 -allLicenses CC
+.\veeamVSPCLicenses.ps1 -allLicenses CC -debug
+```
+
 ### `-debug`
 
 Shows the collected tenant license information as tables.
@@ -123,7 +135,7 @@ Example:
 
 ```powershell
 .\veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -debug
-.\veeamVSPCLicenses.ps1 -allLicenses VBR,Agent,MS365 -debug
+.\veeamVSPCLicenses.ps1 -allLicenses VBR,Agent,MS365,CC -debug
 ```
 
 ## Current Debug Output
@@ -160,6 +172,19 @@ Currently displayed columns:
 - `Units`
 - `Used Units`
 
+### `CC`
+
+Currently displayed columns:
+
+- `Tenant`
+- `Status`
+- `Hostname`
+- `Cloud Connect`
+- `License Expiration`
+- `Units`
+- `Used Units`
+- `License ID`
+
 ## Maintenance Note
 
 When new script parameters are added, this `README.md` must be updated as part of the same change.
@@ -172,6 +197,7 @@ Current non-debug PRTG output is implemented for:
 .\veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType VBR
 .\veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType Agent
 .\veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType MS365
+.\veeamVSPCLicenses.ps1 -allLicenses CC
 ```
 
 The script returns `EXE/Script Advanced` XML.
@@ -270,3 +296,47 @@ Status mapping:
 MS365 limits:
 
 - `Used Units`: error if `Used Units > Units`
+
+### Cloud Connect Channels
+
+One channel set per Cloud Connect host:
+
+- `Status - <Hostname>`
+- `Units - <Hostname>`
+- `Used Units - <Hostname>`
+- `Days Remaining - <Hostname>`
+- `Cloud Connect - <Hostname>`
+
+The sensor message text contains:
+
+- `Hostname`
+- `License ID`
+
+Cloud Connect is treated as provider-level, not tenant-level.
+
+The Cloud Connect `Status` channel uses:
+
+- `lookups/custom/sm-it.veeam.vspc.cc.license.status.ovl`
+
+Status mapping:
+
+- `0` = `Valid`
+- `1` = `Valid, expires in 60 days or less`
+- `2` = `Valid, expires in 15 days or less`
+- `3` = `Used units exceeded licensed units`
+- `4` = `License status is not valid`
+
+The `Cloud Connect` channel uses:
+
+- `lookups/custom/sm-it.veeam.vspc.cc.cloudconnect.status.ovl`
+
+Status mapping:
+
+- `0` = `Cloud Connect disabled`
+- `1` = `Cloud Connect enabled`
+
+Cloud Connect limits:
+
+- `Used Units`: error if `Used Units > Units`
+- `Days Remaining`: warning at `60`
+- `Days Remaining`: error at `15`
