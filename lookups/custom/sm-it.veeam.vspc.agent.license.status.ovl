@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValueLookup id="sm-it.veeam.vspc.agent.license.status" desiredValue="0" undefinedState="Error" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="PaeValueLookup.xsd">
+  <Lookups>
+    <SingleInt state="OK" value="0">License status is healthy</SingleInt>
+    <SingleInt state="Error" value="1">License status requires attention</SingleInt>
+    <SingleInt state="Error" value="2">License status is missing</SingleInt>
+  </Lookups>
+</ValueLookup>

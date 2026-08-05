@@ -1,0 +1,5 @@
+$VeeamBaseUri = "https://<host>:<port>/api/v3/"
+$VeeamAPIKey = "<apiKey>"   
+$veeamHeader = @{
+    Authorization = 'bearer ' + $VeeamAPIKey
+}

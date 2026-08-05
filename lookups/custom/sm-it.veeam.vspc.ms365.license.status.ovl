@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValueLookup id="sm-it.veeam.vspc.ms365.license.status" desiredValue="0" undefinedState="Error" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="PaeValueLookup.xsd">
+  <Lookups>
+    <SingleInt state="OK" value="0">License status is valid</SingleInt>
+    <SingleInt state="Error" value="1">License status is not valid</SingleInt>
+    <SingleInt state="Error" value="2">Used units exceeded licensed units</SingleInt>
+  </Lookups>
+</ValueLookup>

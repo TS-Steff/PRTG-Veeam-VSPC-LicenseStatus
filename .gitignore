@@ -1,0 +1,7 @@
+
+env.config
+config.ps1
+veeamVSCPtoPRTG_Includes/config.ps1
+veeamVSCPtoPRTG_Includes/env.config
+.codex/
+nfo.md

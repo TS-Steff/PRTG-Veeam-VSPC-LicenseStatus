@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValueLookup id="sm-it.veeam.vspc.vbr.license.status" desiredValue="0" undefinedState="Error" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="PaeValueLookup.xsd">
+  <Lookups>
+    <SingleInt state="OK" value="0">Valid</SingleInt>
+    <SingleInt state="Warning" value="1">Valid, expires in 60 days or less</SingleInt>
+    <SingleInt state="Error" value="2">Valid, expires in 15 days or less</SingleInt>
+    <SingleInt state="Error" value="3">Used units exceeded licensed units</SingleInt>
+    <SingleInt state="Error" value="4">License status is not valid</SingleInt>
+  </Lookups>
+</ValueLookup>
