@@ -13,7 +13,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$includesPath = Join-Path $scriptRoot 'veeamVSCPtoPRTG_Includes'
+$includesPath = Join-Path $scriptRoot 'veeamVSPCLicenses_Includes'
 
 . (Join-Path $includesPath 'config.ps1')
 . (Join-Path $includesPath 'functions.ps1')
@@ -88,3 +88,4 @@ if ($TenantLicences) {
 
     exit 0
 }
+
