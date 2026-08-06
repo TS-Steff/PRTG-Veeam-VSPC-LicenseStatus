@@ -98,7 +98,11 @@ if ($TenantLicences) {
     exit 0
 }
 
-
-
-
-
+Write-Output @"
+<?xml version="1.0" encoding="UTF-8" ?>
+<prtg>
+  <error>1</error>
+  <text>Missing parameter - README.md</text>
+</prtg>
+"@
+exit 1
