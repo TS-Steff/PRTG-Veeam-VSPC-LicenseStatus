@@ -1,4 +1,4 @@
-# veeamVSPCLicenses.ps1
+# sm-it_veeamVSPCLicenses.ps1
 
 PowerShell script to query tenant and license information from the Veeam Service Provider Console REST API.
 
@@ -23,13 +23,13 @@ Required lookup files:
 ## Script
 
 ```powershell
-.\veeamVSPCLicenses.ps1
+.\sm-it_veeamVSPCLicenses.ps1
 ```
 
 ## Current Parameter Set
 
 ```powershell
-.\veeamVSPCLicenses.ps1 `
+.\sm-it_veeamVSPCLicenses.ps1 `
   [-listTenants] `
   [-allLicenses VBR|Agent|MS365|CC] `
   [-TenantLicences "Tenant Name"] `
@@ -46,7 +46,7 @@ Lists all tenants returned by the VSPC API.
 Example:
 
 ```powershell
-.\veeamVSPCLicenses.ps1 -listTenants
+.\sm-it_veeamVSPCLicenses.ps1 -listTenants
 ```
 
 ### `-allLicenses`
@@ -56,10 +56,10 @@ Queries licenses across all tenants.
 Example:
 
 ```powershell
-.\veeamVSPCLicenses.ps1 -allLicenses VBR
-.\veeamVSPCLicenses.ps1 -allLicenses VBR -debug
-.\veeamVSPCLicenses.ps1 -allLicenses CC
-.\veeamVSPCLicenses.ps1 -allLicenses VBR,MS365,CC -debug
+.\sm-it_veeamVSPCLicenses.ps1 -allLicenses VBR
+.\sm-it_veeamVSPCLicenses.ps1 -allLicenses VBR -debug
+.\sm-it_veeamVSPCLicenses.ps1 -allLicenses CC
+.\sm-it_veeamVSPCLicenses.ps1 -allLicenses VBR,MS365,CC -debug
 ```
 
 Current behavior:
@@ -81,8 +81,8 @@ Queries license information for the specified tenant.
 Example:
 
 ```powershell
-.\veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name"
-.\veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType VBR
+.\sm-it_veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name"
+.\sm-it_veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType VBR
 ```
 
 Current behavior:
@@ -104,10 +104,10 @@ Allowed values:
 Examples:
 
 ```powershell
-.\veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType VBR -debug
-.\veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType Agent -debug
-.\veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType MS365 -debug
-.\veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType VBR,MS365 -debug
+.\sm-it_veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType VBR -debug
+.\sm-it_veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType Agent -debug
+.\sm-it_veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType MS365 -debug
+.\sm-it_veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType VBR,MS365 -debug
 ```
 
 If `-licenseType` is omitted, all currently implemented license types are queried.
@@ -115,16 +115,16 @@ If `-licenseType` is omitted, all currently implemented license types are querie
 For `PRTG Advanced XML` output, use exactly one license type:
 
 ```powershell
-.\veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType VBR
-.\veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType Agent
-.\veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType MS365
+.\sm-it_veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType VBR
+.\sm-it_veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType Agent
+.\sm-it_veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType MS365
 ```
 
 Cloud Connect is provider-level and should be queried with:
 
 ```powershell
-.\veeamVSPCLicenses.ps1 -allLicenses CC
-.\veeamVSPCLicenses.ps1 -allLicenses CC -debug
+.\sm-it_veeamVSPCLicenses.ps1 -allLicenses CC
+.\sm-it_veeamVSPCLicenses.ps1 -allLicenses CC -debug
 ```
 
 ### `-debug`
@@ -134,8 +134,8 @@ Shows the collected tenant license information as tables.
 Example:
 
 ```powershell
-.\veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -debug
-.\veeamVSPCLicenses.ps1 -allLicenses VBR,Agent,MS365,CC -debug
+.\sm-it_veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -debug
+.\sm-it_veeamVSPCLicenses.ps1 -allLicenses VBR,Agent,MS365,CC -debug
 ```
 
 ## Current Debug Output
@@ -194,10 +194,10 @@ When new script parameters are added, this `README.md` must be updated as part o
 Current non-debug PRTG output is implemented for:
 
 ```powershell
-.\veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType VBR
-.\veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType Agent
-.\veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType MS365
-.\veeamVSPCLicenses.ps1 -allLicenses CC
+.\sm-it_veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType VBR
+.\sm-it_veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType Agent
+.\sm-it_veeamVSPCLicenses.ps1 -TenantLicences "Tenant Name" -licenseType MS365
+.\sm-it_veeamVSPCLicenses.ps1 -allLicenses CC
 ```
 
 The script returns `EXE/Script Advanced` XML.
@@ -340,5 +340,6 @@ Cloud Connect limits:
 - `Used Units`: error if `Used Units > Units`
 - `Days Remaining`: warning at `60`
 - `Days Remaining`: error at `15`
+
 
 
