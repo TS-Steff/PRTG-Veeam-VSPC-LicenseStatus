@@ -2,11 +2,13 @@
 
 PowerShell script to query tenant and license information from the Veeam Service Provider Console REST API.
 
+Target runtime: Windows PowerShell 5.1 (powershell.exe).
+
 ## Installation
 
 1. Copy the repository contents to the PRTG server.
 2. Use `sm-it_veeamVSPCLicenses_Includes/config.ps1.example` as template and create `sm-it_veeamVSPCLicenses_Includes/config.ps1` with the correct VSPC base URL and API key.
-3. Make sure the PRTG server or execution account can run PowerShell scripts.
+3. Make sure the PRTG server or execution account can run Windows PowerShell 5.1 scripts (`powershell.exe`).
 4. Copy the required lookup files from `lookups/custom/` to the PRTG server under `\lookups\custom\`.
 5. Reload the lookup files in PRTG.
 6. Configure the script as an `EXE/Script Advanced` sensor when using non-debug XML output.
@@ -64,7 +66,7 @@ Example:
 
 Current behavior:
 
-- Without `-debug`, `PRTG Advanced XML` output is currently implemented for `-allLicenses CC`.
+- Without `-debug`, `PRTG Advanced XML` output is implemented for exactly one `-allLicenses` value.
 - With `-debug`, the collected data is shown as tables.
 
 Allowed values:
@@ -340,6 +342,9 @@ Cloud Connect limits:
 - `Used Units`: error if `Used Units > Units`
 - `Days Remaining`: warning at `60`
 - `Days Remaining`: error at `15`
+
+
+
 
 
 

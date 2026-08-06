@@ -47,8 +47,17 @@ if ($allLicenses) {
         }
 
         switch ($selectedTypes[0]) {
+            'VBR' {
+                Write-Output (Convert-VbrLicenseOverviewToPrtgXml -LicenseOverview $allLicenseOverview -IncludeText:$false -IncludeTenantInChannel)
+            }
+            'Agent' {
+                Write-Output (Convert-AgentLicenseOverviewToPrtgXml -LicenseOverview $allLicenseOverview -IncludeText:$false -IncludeTenantInChannel)
+            }
+            'MS365' {
+                Write-Output (Convert-Ms365LicenseOverviewToPrtgXml -LicenseOverview $allLicenseOverview -IncludeText:$false -IncludeTenantInChannel)
+            }
             'CC' {
-                Write-Output (Convert-CloudConnectLicenseOverviewToPrtgXml -LicenseOverview $allLicenseOverview)
+                Write-Output (Convert-CloudConnectLicenseOverviewToPrtgXml -LicenseOverview $allLicenseOverview -IncludeText:$false)
             }
         }
     }
@@ -88,5 +97,8 @@ if ($TenantLicences) {
 
     exit 0
 }
+
+
+
 
 

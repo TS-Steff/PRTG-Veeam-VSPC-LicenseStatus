@@ -1,7 +1,7 @@
 function Invoke-VspcGet($Path) {
     $uri = $VeeamBaseUri.TrimEnd('/') + '/' + $Path.TrimStart('/')
     try {
-        $response = Invoke-WebRequest -Uri $uri -Method GET -Headers $veeamHeader -MaximumRedirection 0 -ErrorAction Stop
+        $response = Invoke-WebRequest -Uri $uri -Method GET -Headers $veeamHeader -MaximumRedirection 0 -UseBasicParsing -ErrorAction Stop
     }
     catch {
         $webResponse = $_.Exception.Response
@@ -35,7 +35,7 @@ function Get-VspcResponseData($Response) {
 
         if ($trimmedResponse.StartsWith('{') -or $trimmedResponse.StartsWith('[')) {
             try {
-                $Response = $trimmedResponse | ConvertFrom-Json -Depth 100
+                $Response = $trimmedResponse | ConvertFrom-Json
             }
             catch {
                 throw "VSPC API returned a JSON string that could not be parsed: $($_.Exception.Message)"
@@ -668,7 +668,9 @@ function Show-AllLicenseOverviewDebug {
 function Convert-VbrLicenseOverviewToPrtgXml {
     param(
         [Parameter(Mandatory = $true)]
-        $LicenseOverview
+        $LicenseOverview,
+        [switch]$IncludeText = $true,
+        [switch]$IncludeTenantInChannel
     )
 
     $lookupId = 'sm-it.veeam.vspc.vbr.license.status'
@@ -677,8 +679,13 @@ function Convert-VbrLicenseOverviewToPrtgXml {
     [void]$xml.AppendLine('<prtg>')
 
     $messageParts = @()
+    $vbrTenants = @($LicenseOverview.VbrLicenses | ForEach-Object {
+        [string](Get-OptionalPropertyValue $_ @('Tenant'))
+    } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
+    $showTenantInChannel = $IncludeTenantInChannel -or ($vbrTenants.Count -gt 1)
 
     foreach ($license in @($LicenseOverview.VbrLicenses)) {
+        $tenant = [string](Get-OptionalPropertyValue $license @('Tenant'))
         $hostname = [string](Get-OptionalPropertyValue $license @('Hostname'))
         $licenseId = [string](Get-OptionalPropertyValue $license @('License ID'))
         $statusCode = Get-VbrPrtgStatusCode -License $license
@@ -690,12 +697,13 @@ function Convert-VbrLicenseOverviewToPrtgXml {
             $daysRemaining = [math]::Floor(($expirationDate.UtcDateTime - (Get-Date).ToUniversalTime()).TotalDays)
         }
 
-        $channelLabel = if ($hostname) { $hostname } else { 'Unknown Host' }
+        $hostLabel = if ($hostname) { $hostname } else { 'Unknown Host' }
+        $channelLabel = if ($showTenantInChannel -and -not [string]::IsNullOrWhiteSpace($tenant)) { "{0} - {1}" -f $tenant, $hostLabel } else { $hostLabel }
         $messageParts += "{0}: {1}" -f $channelLabel, ($(if ($licenseId) { $licenseId } else { 'No License ID' }))
 
         [void]$xml.Append(
             (New-PrtgResultXml `
-                -Channel ("Status - {0}" -f $channelLabel) `
+                -Channel ("{0} - Status" -f $channelLabel) `
                 -Value ([string]$statusCode) `
                 -Unit 'Custom' `
                 -CustomUnit 'State' `
@@ -706,7 +714,7 @@ function Convert-VbrLicenseOverviewToPrtgXml {
         if ($null -ne $units) {
             [void]$xml.Append(
                 (New-PrtgResultXml `
-                    -Channel ("Units - {0}" -f $channelLabel) `
+                    -Channel ("{0} - Units" -f $channelLabel) `
                     -Value ([string]$units) `
                     -Unit 'Custom' `
                     -CustomUnit 'Units' `
@@ -717,7 +725,7 @@ function Convert-VbrLicenseOverviewToPrtgXml {
         if ($null -ne $usedUnits) {
             [void]$xml.Append(
                 (New-PrtgResultXml `
-                    -Channel ("Used Units - {0}" -f $channelLabel) `
+                    -Channel ("{0} - Used Units" -f $channelLabel) `
                     -Value ([string]$usedUnits) `
                     -Unit 'Custom' `
                     -CustomUnit 'Units' `
@@ -730,7 +738,7 @@ function Convert-VbrLicenseOverviewToPrtgXml {
         if ($null -ne $daysRemaining) {
             [void]$xml.Append(
                 (New-PrtgResultXml `
-                    -Channel ("Days Remaining - {0}" -f $channelLabel) `
+                    -Channel ("{0} - Days Remaining" -f $channelLabel) `
                     -Value ([string]$daysRemaining) `
                     -Unit 'Custom' `
                     -CustomUnit 'Days' `
@@ -750,7 +758,12 @@ function Convert-VbrLicenseOverviewToPrtgXml {
         'No VBR licenses found.'.Replace('#', '')
     }
 
-    [void]$xml.AppendLine(("  <text>{0}</text>" -f (ConvertTo-XmlSafeText $sensorMessage)))
+    if ($IncludeText) {
+        [void]$xml.AppendLine(("  <text>{0}</text>" -f (ConvertTo-XmlSafeText $sensorMessage)))
+    }
+    else {
+        [void]$xml.AppendLine('  <text></text>')
+    }
     [void]$xml.AppendLine('</prtg>')
     return $xml.ToString()
 }
@@ -758,7 +771,9 @@ function Convert-VbrLicenseOverviewToPrtgXml {
 function Convert-AgentLicenseOverviewToPrtgXml {
     param(
         [Parameter(Mandatory = $true)]
-        $LicenseOverview
+        $LicenseOverview,
+        [switch]$IncludeText = $true,
+        [switch]$IncludeTenantInChannel
     )
 
     $lookupId = 'sm-it.veeam.vspc.agent.license.status'
@@ -767,13 +782,19 @@ function Convert-AgentLicenseOverviewToPrtgXml {
     [void]$xml.AppendLine('<prtg>')
 
     $messageParts = @()
+    $agentTenants = @($LicenseOverview.AgentLicenses | ForEach-Object {
+        [string](Get-OptionalPropertyValue $_ @('Tenant'))
+    } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
+    $showTenantInChannel = $IncludeTenantInChannel -or ($agentTenants.Count -gt 1)
 
     foreach ($license in @($LicenseOverview.AgentLicenses)) {
+        $tenant = [string](Get-OptionalPropertyValue $license @('Tenant'))
         $hostname = [string](Get-OptionalPropertyValue $license @('Hostname'))
         $operationMode = [string](Get-OptionalPropertyValue $license @('Operation Mode'))
         $statusCode = Get-AgentPrtgStatusCode -License $license
 
-        $channelLabel = if ($hostname) { $hostname } else { 'Unknown Host' }
+        $hostLabel = if ($hostname) { $hostname } else { 'Unknown Host' }
+        $channelLabel = if ($showTenantInChannel -and -not [string]::IsNullOrWhiteSpace($tenant)) { "{0} - {1}" -f $tenant, $hostLabel } else { $hostLabel }
         $messageParts += if ($operationMode) {
             "{0}: {1}" -f $channelLabel, $operationMode
         }
@@ -783,7 +804,7 @@ function Convert-AgentLicenseOverviewToPrtgXml {
 
         [void]$xml.Append(
             (New-PrtgResultXml `
-                -Channel ("Status - {0}" -f $channelLabel) `
+                -Channel ("{0} - Status" -f $channelLabel) `
                 -Value ([string]$statusCode) `
                 -Unit 'Custom' `
                 -CustomUnit 'State' `
@@ -799,7 +820,12 @@ function Convert-AgentLicenseOverviewToPrtgXml {
         'No Agent licenses found.'.Replace('#', '')
     }
 
-    [void]$xml.AppendLine(("  <text>{0}</text>" -f (ConvertTo-XmlSafeText $sensorMessage)))
+    if ($IncludeText) {
+        [void]$xml.AppendLine(("  <text>{0}</text>" -f (ConvertTo-XmlSafeText $sensorMessage)))
+    }
+    else {
+        [void]$xml.AppendLine('  <text></text>')
+    }
     [void]$xml.AppendLine('</prtg>')
     return $xml.ToString()
 }
@@ -807,7 +833,9 @@ function Convert-AgentLicenseOverviewToPrtgXml {
 function Convert-Ms365LicenseOverviewToPrtgXml {
     param(
         [Parameter(Mandatory = $true)]
-        $LicenseOverview
+        $LicenseOverview,
+        [switch]$IncludeText = $true,
+        [switch]$IncludeTenantInChannel
     )
 
     $lookupId = 'sm-it.veeam.vspc.ms365.license.status'
@@ -816,8 +844,13 @@ function Convert-Ms365LicenseOverviewToPrtgXml {
     [void]$xml.AppendLine('<prtg>')
 
     $messageParts = @()
+    $ms365Tenants = @($LicenseOverview.Vb365Licenses | ForEach-Object {
+        [string](Get-OptionalPropertyValue $_ @('Tenant'))
+    } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
+    $showTenantInChannel = $IncludeTenantInChannel -or ($ms365Tenants.Count -gt 1)
 
     foreach ($license in @($LicenseOverview.Vb365Licenses)) {
+        $tenant = [string](Get-OptionalPropertyValue $license @('Tenant'))
         $hostname = [string](Get-OptionalPropertyValue $license @('Hostname'))
         $statusCode = Get-Ms365PrtgStatusCode -License $license
         $units = Get-NullableDouble (Get-OptionalPropertyValue $license @('Units'))
@@ -825,12 +858,13 @@ function Convert-Ms365LicenseOverviewToPrtgXml {
         $autoUpdate = Get-OptionalPropertyValue $license @('License Auto Update')
         $autoUpdateValue = if ($null -eq $autoUpdate) { $null } elseif ([bool]$autoUpdate) { 1 } else { 0 }
 
-        $channelLabel = if ($hostname) { $hostname } else { 'Unknown Host' }
+        $hostLabel = if ($hostname) { $hostname } else { 'Unknown Host' }
+        $channelLabel = if ($showTenantInChannel -and -not [string]::IsNullOrWhiteSpace($tenant)) { "{0} - {1}" -f $tenant, $hostLabel } else { $hostLabel }
         $messageParts += $channelLabel
 
         [void]$xml.Append(
             (New-PrtgResultXml `
-                -Channel ("Status - {0}" -f $channelLabel) `
+                -Channel ("{0} - Status" -f $channelLabel) `
                 -Value ([string]$statusCode) `
                 -Unit 'Custom' `
                 -CustomUnit 'State' `
@@ -841,7 +875,7 @@ function Convert-Ms365LicenseOverviewToPrtgXml {
         if ($null -ne $units) {
             [void]$xml.Append(
                 (New-PrtgResultXml `
-                    -Channel ("Units - {0}" -f $channelLabel) `
+                    -Channel ("{0} - Units" -f $channelLabel) `
                     -Value ([string]$units) `
                     -Unit 'Custom' `
                     -CustomUnit 'Units' `
@@ -852,7 +886,7 @@ function Convert-Ms365LicenseOverviewToPrtgXml {
         if ($null -ne $usedUnits) {
             [void]$xml.Append(
                 (New-PrtgResultXml `
-                    -Channel ("Used Units - {0}" -f $channelLabel) `
+                    -Channel ("{0} - Used Units" -f $channelLabel) `
                     -Value ([string]$usedUnits) `
                     -Unit 'Custom' `
                     -CustomUnit 'Units' `
@@ -865,7 +899,7 @@ function Convert-Ms365LicenseOverviewToPrtgXml {
         if ($null -ne $autoUpdateValue) {
             [void]$xml.Append(
                 (New-PrtgResultXml `
-                    -Channel ("License Auto Update - {0}" -f $channelLabel) `
+                    -Channel ("{0} - License Auto Update" -f $channelLabel) `
                     -Value ([string]$autoUpdateValue) `
                     -Unit 'Custom' `
                     -CustomUnit 'State' `
@@ -882,7 +916,12 @@ function Convert-Ms365LicenseOverviewToPrtgXml {
         'No Microsoft 365 licenses found.'.Replace('#', '')
     }
 
-    [void]$xml.AppendLine(("  <text>{0}</text>" -f (ConvertTo-XmlSafeText $sensorMessage)))
+    if ($IncludeText) {
+        [void]$xml.AppendLine(("  <text>{0}</text>" -f (ConvertTo-XmlSafeText $sensorMessage)))
+    }
+    else {
+        [void]$xml.AppendLine('  <text></text>')
+    }
     [void]$xml.AppendLine('</prtg>')
     return $xml.ToString()
 }
@@ -890,7 +929,8 @@ function Convert-Ms365LicenseOverviewToPrtgXml {
 function Convert-CloudConnectLicenseOverviewToPrtgXml {
     param(
         [Parameter(Mandatory = $true)]
-        $LicenseOverview
+        $LicenseOverview,
+        [switch]$IncludeText = $true
     )
 
     $lookupId = 'sm-it.veeam.vspc.cc.license.status'
@@ -918,7 +958,7 @@ function Convert-CloudConnectLicenseOverviewToPrtgXml {
 
         [void]$xml.Append(
             (New-PrtgResultXml `
-                -Channel ("Status - {0}" -f $channelLabel) `
+                -Channel ("{0} - Status" -f $channelLabel) `
                 -Value ([string]$statusCode) `
                 -Unit 'Custom' `
                 -CustomUnit 'State' `
@@ -929,7 +969,7 @@ function Convert-CloudConnectLicenseOverviewToPrtgXml {
         if ($null -ne $units) {
             [void]$xml.Append(
                 (New-PrtgResultXml `
-                    -Channel ("Units - {0}" -f $channelLabel) `
+                    -Channel ("{0} - Units" -f $channelLabel) `
                     -Value ([string]$units) `
                     -Unit 'Custom' `
                     -CustomUnit 'Units' `
@@ -940,7 +980,7 @@ function Convert-CloudConnectLicenseOverviewToPrtgXml {
         if ($null -ne $usedUnits) {
             [void]$xml.Append(
                 (New-PrtgResultXml `
-                    -Channel ("Used Units - {0}" -f $channelLabel) `
+                    -Channel ("{0} - Used Units" -f $channelLabel) `
                     -Value ([string]$usedUnits) `
                     -Unit 'Custom' `
                     -CustomUnit 'Units' `
@@ -953,7 +993,7 @@ function Convert-CloudConnectLicenseOverviewToPrtgXml {
         if ($null -ne $daysRemaining) {
             [void]$xml.Append(
                 (New-PrtgResultXml `
-                    -Channel ("Days Remaining - {0}" -f $channelLabel) `
+                    -Channel ("{0} - Days Remaining" -f $channelLabel) `
                     -Value ([string]$daysRemaining) `
                     -Unit 'Custom' `
                     -CustomUnit 'Days' `
@@ -969,7 +1009,7 @@ function Convert-CloudConnectLicenseOverviewToPrtgXml {
             $cloudConnectValue = if ($cloudConnect -eq 'Yes') { 1 } else { 0 }
             [void]$xml.Append(
                 (New-PrtgResultXml `
-                    -Channel ("Cloud Connect - {0}" -f $channelLabel) `
+                    -Channel ("{0} - Cloud Connect" -f $channelLabel) `
                     -Value ([string]$cloudConnectValue) `
                     -Unit 'Custom' `
                     -CustomUnit 'State' `
@@ -986,10 +1026,24 @@ function Convert-CloudConnectLicenseOverviewToPrtgXml {
         'No Cloud Connect licenses found.'.Replace('#', '')
     }
 
-    [void]$xml.AppendLine(("  <text>{0}</text>" -f (ConvertTo-XmlSafeText $sensorMessage)))
+    if ($IncludeText) {
+        [void]$xml.AppendLine(("  <text>{0}</text>" -f (ConvertTo-XmlSafeText $sensorMessage)))
+    }
+    else {
+        [void]$xml.AppendLine('  <text></text>')
+    }
     [void]$xml.AppendLine('</prtg>')
     return $xml.ToString()
 }
 function get-AllOrgs{
     return Invoke-VspcGet 'organizations/companies'
 }
+
+
+
+
+
+
+
+
+
