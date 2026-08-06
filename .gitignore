@@ -1,8 +1,9 @@
 
 env.config
 config.ps1
-veeamVSPCLicenses_Includes/config.ps1
-veeamVSPCLicenses_Includes/env.config
+sm-it_veeamVSPCLicenses_Includes/config.ps1
+sm-it_veeamVSPCLicenses_Includes/env.config
 .codex/
 nfo.md
+
 
